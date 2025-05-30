@@ -6,8 +6,8 @@ import java.util.stream.Collectors;
 
 import com.ccp.decorators.CcpJsonRepresentation;
 
-class ResponseHandlerToSearch implements Function<CcpJsonRepresentation, List<CcpJsonRepresentation>>{
-	private CcpSourceHandler handler = new CcpSourceHandler();
+class FunctionResponseHandlerToSearch implements Function<CcpJsonRepresentation, List<CcpJsonRepresentation>>{
+	private FunctionSourceHandler handler = new FunctionSourceHandler();
 	
 	public List<CcpJsonRepresentation> apply(CcpJsonRepresentation json) {
 		List<CcpJsonRepresentation> hits = json.getInnerJson("hits").getAsJsonList("hits");

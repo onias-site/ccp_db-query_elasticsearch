@@ -75,7 +75,7 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 			
 			if(firstPage) {
 				String url = indexes + "/_search?size=" + pageSize + "&scroll="+ scrollTime;
-				ResponseHandlerToConsumeSearch searchDataTransform = new ResponseHandlerToConsumeSearch();
+				FunctionResponseHandlerToConsumeSearch searchDataTransform = new FunctionResponseHandlerToConsumeSearch();
 				CcpJsonRepresentation flows = CcpOtherConstants.EMPTY_JSON.addJsonTransformer("200", CcpOtherConstants.DO_NOTHING).addJsonTransformer("404", CcpOtherConstants.RETURNS_EMPTY_JSON);
 				CcpJsonRepresentation executeHttpRequest = dbUtils.executeHttpRequest("consumeQueryResult", url, CcpHttpMethods.POST, flows,  elasticQuery.json, CcpHttpResponseType.singleRecord);
 				CcpJsonRepresentation _package = searchDataTransform.apply(executeHttpRequest);
@@ -88,7 +88,7 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 			CcpJsonRepresentation flows = CcpOtherConstants.EMPTY_JSON.addJsonTransformer("200", CcpOtherConstants.DO_NOTHING).addJsonTransformer("404", CcpOtherConstants.RETURNS_EMPTY_JSON);
 			CcpJsonRepresentation scrollRequest = CcpOtherConstants.EMPTY_JSON.put("scroll", scrollTime).put("scroll_id", scrollId);
 			
-			ResponseHandlerToSearch searchDataTransform = new ResponseHandlerToSearch();
+			FunctionResponseHandlerToSearch searchDataTransform = new FunctionResponseHandlerToSearch();
 			CcpJsonRepresentation executeHttpRequest = dbUtils.executeHttpRequest("consumeQueryResult", "/_search/scroll", CcpHttpMethods.POST, flows,  scrollRequest, CcpHttpResponseType.singleRecord);
 			List<CcpJsonRepresentation> hits = searchDataTransform.apply(executeHttpRequest);
 			consumer.accept(hits);
@@ -115,7 +115,7 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 	public List<CcpJsonRepresentation> getResultAsList(CcpDbQueryOptions elasticQuery, String[] resourcesNames, String... fieldsToSearch) {
 		CcpJsonRepresentation executeHttpRequest = this.getResultAsPackage("/_search", CcpHttpMethods.POST, 200, elasticQuery, resourcesNames, fieldsToSearch);
 		
-		ResponseHandlerToSearch searchDataTransform = new ResponseHandlerToSearch();
+		FunctionResponseHandlerToSearch searchDataTransform = new FunctionResponseHandlerToSearch();
 		List<CcpJsonRepresentation> hits = searchDataTransform.apply(executeHttpRequest);
 		return hits;
 	}

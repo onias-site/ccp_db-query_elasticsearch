@@ -4,7 +4,7 @@ import java.util.function.Function;
 
 import com.ccp.decorators.CcpJsonRepresentation;
 
-class CcpSourceHandler  implements Function<CcpJsonRepresentation, CcpJsonRepresentation>{
+class FunctionSourceHandler  implements Function<CcpJsonRepresentation, CcpJsonRepresentation>{
 
 	
 	public CcpJsonRepresentation apply(CcpJsonRepresentation x) {
