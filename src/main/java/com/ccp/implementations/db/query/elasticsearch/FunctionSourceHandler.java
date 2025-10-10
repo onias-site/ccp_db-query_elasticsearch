@@ -1,10 +1,10 @@
 package com.ccp.implementations.db.query.elasticsearch;
 
-import java.util.function.Function;
-
 import com.ccp.decorators.CcpJsonRepresentation;
 import com.ccp.decorators.CcpJsonRepresentation.CcpJsonFieldName;
-class FunctionSourceHandler  implements Function<CcpJsonRepresentation, CcpJsonRepresentation>{
+import com.ccp.especifications.mensageria.receiver.CcpBusiness;
+
+class FunctionSourceHandler implements CcpBusiness{
 	enum JsonFieldNames implements CcpJsonFieldName{
 		_source, _index, _id, id, entity
 	}
