@@ -6,7 +6,7 @@ import java.util.stream.Collectors;
 import com.ccp.constantes.CcpOtherConstants;
 import com.ccp.decorators.CcpJsonRepresentation;
 import com.ccp.decorators.CcpJsonRepresentation.CcpJsonFieldName;
-import com.ccp.especifications.mensageria.receiver.CcpBusiness;
+import com.ccp.business.CcpBusiness;
 
 class FunctionResponseHandlerToConsumeSearch implements CcpBusiness{
 	enum JsonFieldNames implements CcpJsonFieldName{
