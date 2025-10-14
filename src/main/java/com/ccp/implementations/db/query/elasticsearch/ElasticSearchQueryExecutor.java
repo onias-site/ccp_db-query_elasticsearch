@@ -179,7 +179,7 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 			
 			CcpJsonRepresentation value = aggregations.getDynamicVersion().getInnerJson(aggregationName);
 			
-			boolean ignore = value.containsField(JsonFieldNames.buckets) == false;
+			boolean ignore = false == value.containsField(JsonFieldNames.buckets);
 			
 			if(ignore) {
 				Double asDoubleNumber = value.getAsDoubleNumber(JsonFieldNames.value);
