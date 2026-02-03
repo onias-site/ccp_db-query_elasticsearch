@@ -2,7 +2,6 @@ package com.ccp.implementations.db.query.elasticsearch;
 
 import com.ccp.decorators.CcpJsonRepresentation;
 import com.ccp.decorators.CcpJsonRepresentation.CcpJsonFieldName;
-import com.ccp.decorators.CcpJsonRepresentation;
 import com.ccp.business.CcpBusiness;
 
 class FunctionSourceHandler implements CcpBusiness{

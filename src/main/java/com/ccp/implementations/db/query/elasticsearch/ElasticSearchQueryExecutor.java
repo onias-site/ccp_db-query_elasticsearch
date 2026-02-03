@@ -8,7 +8,6 @@ import java.util.function.Consumer;
 import com.ccp.constantes.CcpOtherConstants;
 import com.ccp.decorators.CcpJsonRepresentation;
 import com.ccp.decorators.CcpJsonRepresentation.CcpJsonFieldName;
-import com.ccp.decorators.CcpJsonRepresentation;
 import com.ccp.dependency.injection.CcpDependencyInjection;
 import com.ccp.especifications.db.query.CcpQueryOptions;
 import com.ccp.especifications.db.query.CcpQueryExecutor;
@@ -33,7 +32,7 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 		return md;
 	}
 	
-	public CcpJsonRepresentation delete(CcpQueryOptions elasticQuery, String[] resourcesNames) {
+	public CcpJsonRepresentation delete(CcpQueryOptions elasticQuery, String... resourcesNames) {
 		CcpDbRequester dbUtils = CcpDependencyInjection.getDependency(CcpDbRequester.class);
 		
 		CcpJsonRepresentation executeHttpRequest = dbUtils.executeHttpRequest("delete", "/_delete_by_query", CcpHttpMethods.POST, 200, elasticQuery.json,  resourcesNames, CcpHttpResponseType.singleRecord);
