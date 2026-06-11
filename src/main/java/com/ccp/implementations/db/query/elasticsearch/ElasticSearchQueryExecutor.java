@@ -6,6 +6,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 import com.ccp.constantes.CcpOtherConstants;
+import com.ccp.decorators.CcpFieldName;
 import com.ccp.decorators.CcpJsonRepresentation;
 import com.ccp.decorators.CcpJsonRepresentation.CcpJsonFieldName;
 import com.ccp.dependency.injection.CcpDependencyInjection;
@@ -23,7 +24,7 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 		CcpJsonRepresentation md = CcpOtherConstants.EMPTY_JSON;
 		CcpJsonRepresentation aggregations = this.getAggregations(elasticQuery, resourcesNames);
 		
-		List<CcpJsonRepresentation> asMapList = aggregations.getAsJsonList(() -> fieldName);
+		List<CcpJsonRepresentation> asMapList = aggregations.getAsJsonList(new CcpFieldName(fieldName));
 
 		for (CcpJsonRepresentation mapDecorator : asMapList) {
 			var key = mapDecorator.getAsStringDecorator(JsonFieldNames.key).jsonFieldName();
@@ -127,8 +128,8 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 		CcpJsonRepresentation result = CcpOtherConstants.EMPTY_JSON;
 		for (CcpJsonRepresentation md : resultAsList) {
 			String id = md.getAsString(JsonFieldNames._id);
-			Object value = md.get(() -> field);
-			result = result.put(() -> id, value);
+			Object value = md.get(new CcpFieldName(field));
+			result = result.put(new CcpFieldName(id), value);
 		}
 		return result;
 	}
@@ -145,12 +146,12 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 	
 	public CcpJsonRepresentation getMap(CcpQueryOptions elasticQuery, String[] resourcesNames, String field) {
 		CcpJsonRepresentation aggregations = this.getAggregations(elasticQuery, resourcesNames);
-		List<CcpJsonRepresentation> asMapList = aggregations.getAsJsonList(() -> field);
+		List<CcpJsonRepresentation> asMapList = aggregations.getAsJsonList(new CcpFieldName(field));
 		CcpJsonRepresentation retorno = CcpOtherConstants.EMPTY_JSON;
 		for (CcpJsonRepresentation md : asMapList) {
 			Object value = md.get(JsonFieldNames.value);
 			String key = md.getAsString(JsonFieldNames.key);
-			retorno = retorno.put(() -> key, value);
+			retorno = retorno.put(new CcpFieldName(key), value);
 		}
 		return retorno;
 	}
@@ -177,13 +178,13 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 		
 		for (String aggregationName : allAggregations) {
 			
-			CcpJsonRepresentation value = aggregations.getInnerJson(() -> aggregationName);
+			CcpJsonRepresentation value = aggregations.getInnerJson(new CcpFieldName(aggregationName));
 
 			boolean ignore = false == value.containsField(JsonFieldNames.buckets);
 
 			if(ignore) {
 				Double asDoubleNumber = value.getAsDoubleNumber(JsonFieldNames.value);
-				result = result.put(() -> aggregationName, asDoubleNumber);
+				result = result.put(new CcpFieldName(aggregationName), asDoubleNumber);
 				continue;
 			}
 			List<CcpJsonRepresentation> results = value.getAsJsonList(JsonFieldNames.buckets);
@@ -191,7 +192,7 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 			for (CcpJsonRepresentation object : results) {
 				String key = object.getAsString(JsonFieldNames.key);
 				Double asDoubleNumber = object.getAsDoubleNumber(JsonFieldNames.doc_count);
-				result = result.addToItem(() -> aggregationName, () -> key, asDoubleNumber);
+				result = result.addToItem(new CcpFieldName(aggregationName), new CcpFieldName(key), asDoubleNumber);
 			}
 		}
 		return result;
