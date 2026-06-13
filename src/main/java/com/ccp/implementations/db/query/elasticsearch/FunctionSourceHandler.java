@@ -4,6 +4,10 @@ import com.ccp.decorators.CcpJsonRepresentation;
 import com.ccp.decorators.CcpJsonRepresentation.CcpJsonFieldName;
 import com.ccp.business.CcpBusiness;
 
+/**
+ * {@code CcpBusiness} auxiliar que extrai o campo {@code _source} de um hit do Elasticsearch
+ * e re-adiciona os campos {@code id} e {@code entity} ao JSON resultante.
+ */
 class FunctionSourceHandler implements CcpBusiness{
 	enum JsonFieldNames implements CcpJsonFieldName{
 		_source, _index, _id, id, entity

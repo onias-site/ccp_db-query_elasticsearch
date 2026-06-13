@@ -8,6 +8,11 @@ import com.ccp.decorators.CcpJsonRepresentation;
 import com.ccp.decorators.CcpJsonRepresentation.CcpJsonFieldName;
 import com.ccp.business.CcpBusiness;
 
+/**
+ * {@code CcpBusiness} que processa a primeira página de um scroll search do Elasticsearch.
+ * Extrai a lista de hits (via {@code FunctionSourceHandler}) e o {@code _scroll_id} para uso nas
+ * páginas seguintes.
+ */
 class FunctionResponseHandlerToConsumeSearch implements CcpBusiness{
 	enum JsonFieldNames implements CcpJsonFieldName{
 		hits, _scroll_id

@@ -6,6 +6,10 @@ import java.util.stream.Collectors;
 
 import com.ccp.decorators.CcpJsonRepresentation;
 import com.ccp.decorators.CcpJsonRepresentation.CcpJsonFieldName;
+/**
+ * Função que converte a resposta bruta de um {@code _search} do Elasticsearch na lista de hits,
+ * aplicando {@code FunctionSourceHandler} a cada item para extrair o conteúdo de {@code _source}.
+ */
 class FunctionResponseHandlerToSearch implements Function<CcpJsonRepresentation, List<CcpJsonRepresentation>>{
 	enum JsonFieldNames implements CcpJsonFieldName{
 		hits

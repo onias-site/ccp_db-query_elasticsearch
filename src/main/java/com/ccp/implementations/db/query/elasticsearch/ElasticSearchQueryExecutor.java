@@ -15,6 +15,11 @@ import com.ccp.especifications.db.query.CcpQueryExecutor;
 import com.ccp.especifications.db.utils.CcpDbRequester;
 import com.ccp.especifications.http.CcpHttpMethods;
 import com.ccp.especifications.http.CcpHttpResponseType;
+/**
+ * Implementação de {@code CcpQueryExecutor} para o Elasticsearch. Suporta busca paginada via scroll
+ * ({@code consumeQueryResult}), contagem ({@code total}), listagem ({@code getResultAsList}),
+ * agregações ({@code getAggregations}), deleção e atualização por query.
+ */
 class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 	enum JsonFieldNames implements CcpJsonFieldName{
 		key, value, _scroll_id, scroll, hits, scroll_id, count, _id, _source, total, aggregations, buckets, doc_count
