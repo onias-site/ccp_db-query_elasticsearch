@@ -3,10 +3,10 @@ package com.ccp.implementations.db.query.elasticsearch;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import com.ccp.constantes.CcpOtherConstants;
 import com.ccp.decorators.CcpJsonRepresentation;
 import com.ccp.decorators.CcpJsonRepresentation.CcpJsonFieldName;
 import com.ccp.business.CcpBusiness;
+import com.ccp.constants.CcpOtherConstants;
 
 /**
  * {@code CcpBusiness} que processa a primeira página de um scroll search do Elasticsearch.
