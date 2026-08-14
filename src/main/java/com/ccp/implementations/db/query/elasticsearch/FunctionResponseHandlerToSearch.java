@@ -19,7 +19,7 @@ class FunctionResponseHandlerToSearch implements Function<CcpJsonRepresentation,
 	public List<CcpJsonRepresentation> apply(CcpJsonRepresentation json) {
 		List<CcpJsonRepresentation> hits = json.getInnerJson(JsonFieldNames.hits)
 				.getAsJsonList(JsonFieldNames.hits);
-		List<CcpJsonRepresentation> collect = hits.stream().map(x -> this.handler.apply(x)).collect(Collectors.toList());
+		List<CcpJsonRepresentation> collect = hits.stream().map(x -> this.handler.execute(x)).collect(Collectors.toList());
 		return collect;
 	}
 }

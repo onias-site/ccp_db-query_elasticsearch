@@ -21,7 +21,7 @@ class FunctionResponseHandlerToConsumeSearch implements CcpBusiness{
 	
 	public CcpJsonRepresentation apply(CcpJsonRepresentation json) {
 		List<CcpJsonRepresentation> hits = json.getInnerJson(JsonFieldNames.hits).getAsJsonList(JsonFieldNames.hits);
-		List<CcpJsonRepresentation> collect = hits.stream().map(x -> this.handler.apply(x)).collect(Collectors.toList());
+		List<CcpJsonRepresentation> collect = hits.stream().map(x -> this.handler.execute(x)).collect(Collectors.toList());
 		String _scroll_id = json.getAsString(JsonFieldNames._scroll_id);
 		return CcpOtherConstants.EMPTY_JSON.put(JsonFieldNames.hits, collect).put(JsonFieldNames._scroll_id, _scroll_id);
 	}

@@ -85,7 +85,7 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 				FunctionResponseHandlerToConsumeSearch searchDataTransform = new FunctionResponseHandlerToConsumeSearch();
 				CcpJsonRepresentation flows = CcpOtherConstants.EMPTY_JSON.addJsonTransformer(200, CcpOtherConstants.DO_NOTHING).addJsonTransformer(404, CcpOtherConstants.RETURNS_EMPTY_JSON);
 				CcpJsonRepresentation executeHttpRequest = dbUtils.executeHttpRequest("consumeQueryResult", url, CcpHttpMethods.POST, flows,  elasticQuery.json, CcpHttpResponseType.singleRecord);
-				CcpJsonRepresentation _package = searchDataTransform.apply(executeHttpRequest);
+				CcpJsonRepresentation _package = searchDataTransform.execute(executeHttpRequest);
 				List<CcpJsonRepresentation> hits = _package.getAsJsonList(JsonFieldNames.hits);
 				scrollId = _package.getAsString(JsonFieldNames._scroll_id);
 				consumer.accept(hits);
