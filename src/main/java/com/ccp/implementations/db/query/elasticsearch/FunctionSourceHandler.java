@@ -1,7 +1,7 @@
 package com.ccp.implementations.db.query.elasticsearch;
 
 import com.ccp.decorators.CcpJsonRepresentation;
-import com.ccp.decorators.CcpJsonRepresentation.CcpJsonFieldName;
+import com.ccp.decorators.CcpJsonFieldName;
 import com.ccp.business.CcpBusiness;
 
 /**
@@ -18,7 +18,8 @@ class FunctionSourceHandler implements CcpBusiness{
 		CcpJsonRepresentation internalMap = x.getInnerJson(JsonFieldNames._source);
 		String entity = x.getAsString(JsonFieldNames._index);
 		String id = x.getAsString(JsonFieldNames._id);
-		CcpJsonRepresentation put = internalMap.put(JsonFieldNames.id, id).put(JsonFieldNames.entity, entity);
+		CcpJsonRepresentation put2 = internalMap.put(JsonFieldNames.id, id);
+		CcpJsonRepresentation put = put2.put(JsonFieldNames.entity, entity);
 		return put;
 	}
 	

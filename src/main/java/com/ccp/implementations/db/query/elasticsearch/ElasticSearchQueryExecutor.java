@@ -8,18 +8,19 @@ import java.util.function.Consumer;
 import com.ccp.constants.CcpOtherConstants;
 import com.ccp.decorators.CcpFieldName;
 import com.ccp.decorators.CcpJsonRepresentation;
-import com.ccp.decorators.CcpJsonRepresentation.CcpJsonFieldName;
+import com.ccp.decorators.CcpJsonFieldName;
 import com.ccp.dependency.injection.CcpDependencyInjection;
 import com.ccp.especifications.db.query.CcpQueryOptions;
 import com.ccp.especifications.db.query.CcpQueryExecutor;
 import com.ccp.especifications.db.utils.CcpDbRequester;
 import com.ccp.especifications.http.CcpHttpMethods;
 import com.ccp.especifications.http.CcpHttpResponseType;
-/**
+import com.ccp.decorators.CcpStringDecorator;/**
  * Implementação de {@code CcpQueryExecutor} para o Elasticsearch. Suporta busca paginada via scroll
  * ({@code consumeQueryResult}), contagem ({@code total}), listagem ({@code getResultAsList}),
  * agregações ({@code getAggregations}), deleção e atualização por query.
  */
+
 class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 	enum JsonFieldNames implements CcpJsonFieldName{
 		key, value, _scroll_id, scroll, hits, scroll_id, count, _id, _source, total, aggregations, buckets, doc_count
@@ -28,12 +29,15 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 	public CcpJsonRepresentation getTermsStatis(CcpQueryOptions elasticQuery, String[] resourcesNames, String fieldName) {
 		CcpJsonRepresentation md = CcpOtherConstants.EMPTY_JSON;
 		CcpJsonRepresentation aggregations = this.getAggregations(elasticQuery, resourcesNames);
-		
-		List<CcpJsonRepresentation> asMapList = aggregations.getAsJsonList(new CcpFieldName(fieldName));
+		CcpFieldName ccpFieldName = new CcpFieldName(fieldName);
+
+		List<CcpJsonRepresentation> asMapList = aggregations.getAsJsonList(ccpFieldName);
 
 		for (CcpJsonRepresentation mapDecorator : asMapList) {
-			var key = mapDecorator.getAsStringDecorator(JsonFieldNames.key).jsonFieldName();
-			md = md.put(key, mapDecorator.getAsLongNumber(JsonFieldNames.value));
+			CcpStringDecorator asStringDecorator = mapDecorator.getAsStringDecorator(JsonFieldNames.key);
+			var key = asStringDecorator.jsonFieldName();
+			Long asLongNumber = mapDecorator.getAsLongNumber(JsonFieldNames.value);
+			md = md.put(key, asLongNumber);
 		}
 		return md;
 	}
@@ -63,8 +67,9 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 				consumer.accept(item);
 			}
 		};
-		
-		CcpQueryExecutor consumeQueryResult = this.consumeQueryResult(elasticQuery, resourcesNames, scrollTime, pageSize.longValue(), x, fields);
+		long longValue = pageSize.longValue();
+
+		CcpQueryExecutor consumeQueryResult = this.consumeQueryResult(elasticQuery, resourcesNames, scrollTime, longValue, x, fields);
 		return consumeQueryResult;
 	}	
 	
@@ -81,9 +86,13 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 			boolean firstPage = k == 0;
 			
 			if(firstPage) {
-				String url = indexes + "/_search?size=" + pageSize + "&scroll="+ scrollTime;
+				String indexesMais = indexes + "/_search?size=";
+				String indexesMaisMais = indexesMais + pageSize;
+				String indexesMaisMaisMais = indexesMaisMais + "&scroll=";
+				String url = indexesMaisMaisMais+ scrollTime;
 				FunctionResponseHandlerToConsumeSearch searchDataTransform = new FunctionResponseHandlerToConsumeSearch();
-				CcpJsonRepresentation flows = CcpOtherConstants.EMPTY_JSON.addJsonTransformer(200, CcpOtherConstants.DO_NOTHING).addJsonTransformer(404, CcpOtherConstants.RETURNS_EMPTY_JSON);
+				CcpJsonRepresentation addJsonTransformer = CcpOtherConstants.EMPTY_JSON.addJsonTransformer(200, CcpOtherConstants.DO_NOTHING);
+				CcpJsonRepresentation flows = addJsonTransformer.addJsonTransformer(404, CcpOtherConstants.RETURNS_EMPTY_JSON);
 				CcpJsonRepresentation executeHttpRequest = dbUtils.executeHttpRequest("consumeQueryResult", url, CcpHttpMethods.POST, flows,  elasticQuery.json, CcpHttpResponseType.singleRecord);
 				CcpJsonRepresentation _package = searchDataTransform.execute(executeHttpRequest);
 				List<CcpJsonRepresentation> hits = _package.getAsJsonList(JsonFieldNames.hits);
@@ -91,9 +100,11 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 				consumer.accept(hits);
 				continue;
 			}
-			
-			CcpJsonRepresentation flows = CcpOtherConstants.EMPTY_JSON.addJsonTransformer(200, CcpOtherConstants.DO_NOTHING).addJsonTransformer(404, CcpOtherConstants.RETURNS_EMPTY_JSON);
-			CcpJsonRepresentation scrollRequest = CcpOtherConstants.EMPTY_JSON.put(JsonFieldNames.scroll, scrollTime).put(JsonFieldNames.scroll_id, scrollId);
+			CcpJsonRepresentation addJsonTransformer2 = CcpOtherConstants.EMPTY_JSON.addJsonTransformer(200, CcpOtherConstants.DO_NOTHING);
+
+			CcpJsonRepresentation flows = addJsonTransformer2.addJsonTransformer(404, CcpOtherConstants.RETURNS_EMPTY_JSON);
+			CcpJsonRepresentation put = CcpOtherConstants.EMPTY_JSON.put(JsonFieldNames.scroll, scrollTime);
+			CcpJsonRepresentation scrollRequest = put.put(JsonFieldNames.scroll_id, scrollId);
 			
 			FunctionResponseHandlerToSearch searchDataTransform = new FunctionResponseHandlerToSearch();
 			CcpJsonRepresentation executeHttpRequest = dbUtils.executeHttpRequest("consumeQueryResult", "/_search/scroll", CcpHttpMethods.POST, flows,  scrollRequest, CcpHttpResponseType.singleRecord);
@@ -114,7 +125,10 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 	}
 
 	public String getIndexes(String[] resourcesNames) {
-		String indexes = "/" + Arrays.asList(resourcesNames).toString().replace("[", "").replace("]", "");
+		String toString = Arrays.asList(resourcesNames).toString();
+		String toStringReplace = toString.replace("[", "");
+		String toStringReplaceReplace = toStringReplace.replace("]", "");
+		String indexes = "/" + toStringReplaceReplace;
 		return indexes;
 	}
 
@@ -133,8 +147,10 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 		CcpJsonRepresentation result = CcpOtherConstants.EMPTY_JSON;
 		for (CcpJsonRepresentation md : resultAsList) {
 			String id = md.getAsString(JsonFieldNames._id);
-			Object value = md.get(new CcpFieldName(field));
-			result = result.put(new CcpFieldName(id), value);
+			CcpFieldName ccpFieldName2 = new CcpFieldName(field);
+			Object value = md.get(ccpFieldName2);
+			CcpFieldName ccpFieldName3 = new CcpFieldName(id);
+			result = result.put(ccpFieldName3, value);
 		}
 		return result;
 	}
@@ -151,12 +167,14 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 	
 	public CcpJsonRepresentation getMap(CcpQueryOptions elasticQuery, String[] resourcesNames, String field) {
 		CcpJsonRepresentation aggregations = this.getAggregations(elasticQuery, resourcesNames);
-		List<CcpJsonRepresentation> asMapList = aggregations.getAsJsonList(new CcpFieldName(field));
+		CcpFieldName ccpFieldName4 = new CcpFieldName(field);
+		List<CcpJsonRepresentation> asMapList = aggregations.getAsJsonList(ccpFieldName4);
 		CcpJsonRepresentation retorno = CcpOtherConstants.EMPTY_JSON;
 		for (CcpJsonRepresentation md : asMapList) {
 			Object value = md.get(JsonFieldNames.value);
 			String key = md.getAsString(JsonFieldNames.key);
-			retorno = retorno.put(new CcpFieldName(key), value);
+			CcpFieldName ccpFieldName5 = new CcpFieldName(key);
+			retorno = retorno.put(ccpFieldName5, value);
 		}
 		return retorno;
 	}
@@ -182,14 +200,17 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 		Set<String> allAggregations = aggregations.fieldSet();
 		
 		for (String aggregationName : allAggregations) {
-			
-			CcpJsonRepresentation value = aggregations.getInnerJson(new CcpFieldName(aggregationName));
+			CcpFieldName ccpFieldName6 = new CcpFieldName(aggregationName);
+		
+			CcpJsonRepresentation value = aggregations.getInnerJson(ccpFieldName6);
+			boolean containsField = value.containsField(JsonFieldNames.buckets);
 
-			boolean ignore = false == value.containsField(JsonFieldNames.buckets);
+			boolean ignore = false == containsField;
 
 			if(ignore) {
 				Double asDoubleNumber = value.getAsDoubleNumber(JsonFieldNames.value);
-				result = result.put(new CcpFieldName(aggregationName), asDoubleNumber);
+				CcpFieldName ccpFieldName7 = new CcpFieldName(aggregationName);
+				result = result.put(ccpFieldName7, asDoubleNumber);
 				continue;
 			}
 			List<CcpJsonRepresentation> results = value.getAsJsonList(JsonFieldNames.buckets);
@@ -197,7 +218,9 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 			for (CcpJsonRepresentation object : results) {
 				String key = object.getAsString(JsonFieldNames.key);
 				Double asDoubleNumber = object.getAsDoubleNumber(JsonFieldNames.doc_count);
-				result = result.addToItem(new CcpFieldName(aggregationName), new CcpFieldName(key), asDoubleNumber);
+				CcpFieldName ccpFieldName8 = new CcpFieldName(aggregationName);
+				CcpFieldName ccpFieldName9 = new CcpFieldName(key);
+				result = result.addToItem(ccpFieldName8, ccpFieldName9, asDoubleNumber);
 			}
 		}
 		return result;

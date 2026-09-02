@@ -5,11 +5,12 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.ccp.decorators.CcpJsonRepresentation;
-import com.ccp.decorators.CcpJsonRepresentation.CcpJsonFieldName;
-/**
+import com.ccp.decorators.CcpJsonFieldName;
+import java.util.stream.Stream;/**
  * Função que converte a resposta bruta de um {@code _search} do Elasticsearch na lista de hits,
  * aplicando {@code FunctionSourceHandler} a cada item para extrair o conteúdo de {@code _source}.
  */
+
 class FunctionResponseHandlerToSearch implements Function<CcpJsonRepresentation, List<CcpJsonRepresentation>>{
 	enum JsonFieldNames implements CcpJsonFieldName{
 		hits
@@ -17,9 +18,12 @@ class FunctionResponseHandlerToSearch implements Function<CcpJsonRepresentation,
 	private FunctionSourceHandler handler = new FunctionSourceHandler();
 	
 	public List<CcpJsonRepresentation> apply(CcpJsonRepresentation json) {
-		List<CcpJsonRepresentation> hits = json.getInnerJson(JsonFieldNames.hits)
+		CcpJsonRepresentation innerJson = json.getInnerJson(JsonFieldNames.hits);
+		List<CcpJsonRepresentation> hits = innerJson
 				.getAsJsonList(JsonFieldNames.hits);
-		List<CcpJsonRepresentation> collect = hits.stream().map(x -> this.handler.execute(x)).collect(Collectors.toList());
+				Stream<CcpJsonRepresentation> stream = hits.stream();
+				var streamMap = stream.map(x -> this.handler.execute(x));
+				List<CcpJsonRepresentation> collect = streamMap.collect(Collectors.toList());
 		return collect;
 	}
 }
