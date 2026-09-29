@@ -11,23 +11,23 @@ import java.util.stream.Stream;
 import com.ccp.json.fields.validation.CcpJsonCommonsFields;
 
 /**
- * {@code CcpBusiness} que processa a primeira página de um scroll search do Elasticsearch.
- * Extrai a lista de hits (via {@code FunctionSourceHandler}) e o {@code _scroll_id} para uso nas
- * páginas seguintes.
+ * {@code CcpBusiness} that processes the first page of an Elasticsearch scroll search.
+ * Extracts the list of hits (via {@code FunctionSourceHandler}) and the {@code _scroll_id} used by
+ * the following pages.
  */
 class FunctionResponseHandlerToConsumeSearch implements CcpBusiness{
 	private FunctionSourceHandler handler = new FunctionSourceHandler();
-	
+
 	public CcpJsonRepresentation apply(CcpJsonRepresentation json) {
-		CcpJsonRepresentation innerJson = json.getInnerJson(CcpJsonCommonsFields.hits);
-		List<CcpJsonRepresentation> hits = innerJson.getAsJsonList(CcpJsonCommonsFields.hits);
-		Stream<CcpJsonRepresentation> stream = hits.stream();
-		var streamMap = stream.map(x -> this.handler.execute(x));
-		List<CcpJsonRepresentation> collect = streamMap.collect(Collectors.toList());
+		CcpJsonRepresentation hitsJson = json.getInnerJson(CcpJsonCommonsFields.hits);
+		List<CcpJsonRepresentation> hits = hitsJson.getAsJsonList(CcpJsonCommonsFields.hits);
+		Stream<CcpJsonRepresentation> hitsStream = hits.stream();
+		var sourcesStream = hitsStream.map(x -> this.handler.execute(x));
+		List<CcpJsonRepresentation> sources = sourcesStream.collect(Collectors.toList());
 		String _scroll_id = json.getAsString(CcpJsonCommonsFields._scroll_id);
-		CcpJsonRepresentation put = CcpOtherConstants.EMPTY_JSON.put(CcpJsonCommonsFields.hits, collect);
-		CcpJsonRepresentation put2 = put.put(CcpJsonCommonsFields._scroll_id, _scroll_id);
-		return put2;
+		CcpJsonRepresentation pageWithHits = CcpOtherConstants.EMPTY_JSON.put(CcpJsonCommonsFields.hits, sources);
+		CcpJsonRepresentation pageWithHitsAndScrollId = pageWithHits.put(CcpJsonCommonsFields._scroll_id, _scroll_id);
+		return pageWithHitsAndScrollId;
 	}
 
 }
