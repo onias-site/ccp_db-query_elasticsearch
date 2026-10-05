@@ -6,14 +6,21 @@ import java.util.stream.Collectors;
 
 import com.ccp.decorators.CcpJsonRepresentation;
 import com.ccp.json.fields.validation.CcpJsonCommonsFields;
-import java.util.stream.Stream;/**
+import java.util.stream.Stream;
+
+/**
  * Function that converts the raw response of an Elasticsearch {@code _search} into the list of hits,
  * applying {@code FunctionSourceHandler} to each item to extract the {@code _source} content.
  */
-
 class FunctionResponseHandlerToSearch implements Function<CcpJsonRepresentation, List<CcpJsonRepresentation>>{
+	/** Converts each hit. */
 	private FunctionSourceHandler handler = new FunctionSourceHandler();
 
+	/**
+	 * Returns the hits of the search response, converted by {@code FunctionSourceHandler}.
+	 * @param json the search response
+	 * @return the documents
+	 */
 	public List<CcpJsonRepresentation> apply(CcpJsonRepresentation json) {
 		CcpJsonRepresentation hitsJson = json.getInnerJson(CcpJsonCommonsFields.hits);
 		List<CcpJsonRepresentation> hits = hitsJson

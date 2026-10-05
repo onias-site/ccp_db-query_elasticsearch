@@ -8,6 +8,10 @@ import com.ccp.especifications.db.query.CcpQueryExecutor;
  */
 public class CcpElasticSearchQueryExecutor implements CcpInstanceProvider<CcpQueryExecutor>  {
 
+	/**
+	 * Builds the Elasticsearch implementation of {@code CcpQueryExecutor}.
+	 * @return a new {@code ElasticSearchQueryExecutor}
+	 */
 	public CcpQueryExecutor getInstance() {
 		ElasticSearchQueryExecutor elasticSearchQueryExecutor = new ElasticSearchQueryExecutor();
 		return elasticSearchQueryExecutor;

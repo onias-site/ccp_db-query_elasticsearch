@@ -16,8 +16,14 @@ import com.ccp.json.fields.validation.CcpJsonCommonsFields;
  * the following pages.
  */
 class FunctionResponseHandlerToConsumeSearch implements CcpBusiness{
+	/** Converts each hit. */
 	private FunctionSourceHandler handler = new FunctionSourceHandler();
 
+	/**
+	 * Returns the hits (converted by {@code FunctionSourceHandler}) and the {@code _scroll_id} of the page.
+	 * @param json the search response
+	 * @return {@code hits} and {@code _scroll_id}
+	 */
 	public CcpJsonRepresentation apply(CcpJsonRepresentation json) {
 		CcpJsonRepresentation hitsJson = json.getInnerJson(CcpJsonCommonsFields.hits);
 		List<CcpJsonRepresentation> hits = hitsJson.getAsJsonList(CcpJsonCommonsFields.hits);

@@ -16,17 +16,43 @@ import com.ccp.especifications.db.utils.CcpDbRequester;
 import com.ccp.especifications.http.CcpHttpMethods;
 import com.ccp.especifications.http.CcpHttpResponseType;
 import com.ccp.json.fields.validation.CcpJsonCommonsFields;
-import com.ccp.decorators.CcpStringDecorator;/**
+import com.ccp.decorators.CcpStringDecorator;
+
+/**
  * {@code CcpQueryExecutor} implementation for Elasticsearch. Supports paginated scroll search
  * ({@code consumeQueryResult}), counting ({@code total}), listing ({@code getResultAsList}),
  * aggregations ({@code getAggregations}), and delete and update by query.
  */
-
 class ElasticSearchQueryExecutor implements CcpQueryExecutor {
+	/** Fields of the Elasticsearch requests and responses. */
 	enum JsonFieldNames implements CcpJsonFieldName{
-		key, scroll, scroll_id, count, total, aggregations, buckets, doc_count
+		/** Key of a bucket. */
+		key,
+		/** Expiration of the scroll context. */
+		scroll,
+		/** Id of the scroll context. */
+		scroll_id,
+		/** Result of {@code _count}. */
+		count,
+		/** Total of hits. */
+		total,
+		/** Aggregations block of a search response. */
+		aggregations,
+		/** Buckets of a bucket aggregation. */
+		buckets,
+		/** Number of documents of a bucket. */
+		doc_count
 	}
 
+	/**
+	 * Meant to map each term of the aggregation named by the field to its count. It reads the aggregation as a list of
+	 * items with {@code key} and {@code value}, but {@link #getAggregations(CcpQueryOptions, String...)} returns it as a map
+	 * of key to count, so the result is empty.
+	 * @param elasticQuery the query
+	 * @param resourcesNames the indexes
+	 * @param fieldName the aggregation name
+	 * @return the statistics (see above)
+	 */
 	public CcpJsonRepresentation getTermsStatis(CcpQueryOptions elasticQuery, String[] resourcesNames, String fieldName) {
 		CcpJsonRepresentation termsStatistics = CcpOtherConstants.EMPTY_JSON;
 		CcpJsonRepresentation aggregations = this.getAggregations(elasticQuery, resourcesNames);
@@ -43,6 +69,12 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 		return termsStatistics;
 	}
 	
+	/**
+	 * Deletes the documents matching the query ({@code POST /_delete_by_query}).
+	 * @param elasticQuery the query
+	 * @param resourcesNames the indexes
+	 * @return the response of the database
+	 */
 	public CcpJsonRepresentation delete(CcpQueryOptions elasticQuery, String... resourcesNames) {
 		CcpDbRequester dbUtils = CcpDependencyInjection.getDependency(CcpDbRequester.class);
 		
@@ -52,6 +84,14 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 	}
 
 	
+	/**
+	 * Sends the query to {@code POST /_update_by_query}. The new values are NOT sent (there is no script), so the matching
+	 * documents are only reindexed as they are.
+	 * @param elasticQuery the query
+	 * @param resourcesNames the indexes
+	 * @param newValues ignored
+	 * @return the response of the database
+	 */
 	public CcpJsonRepresentation update(CcpQueryOptions elasticQuery, String[] resourcesNames, CcpJsonRepresentation newValues) {
 		CcpDbRequester dbUtils = CcpDependencyInjection.getDependency(CcpDbRequester.class);
 		
@@ -60,6 +100,16 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 		return response;
 	}
 	
+	/**
+	 * Iterates over the documents with scroll, one document at a time (see the list variant).
+	 * @param elasticQuery the query
+	 * @param resourcesNames the indexes
+	 * @param scrollTime the expiration of the scroll context (e.g. "1m")
+	 * @param pageSize the page size
+	 * @param consumer receives each document
+	 * @param fields unused
+	 * @return this executor
+	 */
 	public CcpQueryExecutor consumeQueryResult(CcpQueryOptions elasticQuery, String[] resourcesNames,
 			String scrollTime, Integer pageSize, Consumer<CcpJsonRepresentation> consumer, String... fields) {
 		
@@ -74,6 +124,18 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 		return queryExecutor;
 	}	
 	
+	/**
+	 * Counts the matching documents and pages through them with scroll: the first page by {@code _search?scroll=}, the next
+	 * ones by {@code /_search/scroll}, handing each page (the sources plus {@code id} and {@code entity}) to the consumer.
+	 * A 404 is treated as an empty page.
+	 * @param elasticQuery the query
+	 * @param resourcesNames the indexes
+	 * @param scrollTime the expiration of the scroll context
+	 * @param pageSize the page size
+	 * @param consumer receives each page
+	 * @param fields unused
+	 * @return this executor
+	 */
 	public CcpQueryExecutor consumeQueryResult(CcpQueryOptions elasticQuery, String[] resourcesNames,
 			String scrollTime, Long pageSize, Consumer<List<CcpJsonRepresentation>> consumer, String... fields) {
 
@@ -116,6 +178,12 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 	}
 
 	
+	/**
+	 * Counts the matching documents ({@code POST /<indexes>/_count}).
+	 * @param elasticQuery the query
+	 * @param resourcesNames the indexes
+	 * @return the count
+	 */
 	public long total(CcpQueryOptions elasticQuery, String[] resourcesNames) {
 		CcpDbRequester dbUtils = CcpDependencyInjection.getDependency(CcpDbRequester.class);
 		String indexes = this.getIndexes(resourcesNames);
@@ -125,6 +193,11 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 		return count;
 	}
 
+	/**
+	 * Joins the index names as the path {@code /a, b} (comma plus space).
+	 * @param resourcesNames the indexes
+	 * @return the path of the indexes
+	 */
 	public String getIndexes(String[] resourcesNames) {
 		String resourcesNamesAsText = Arrays.asList(resourcesNames).toString();
 		String namesWithoutOpeningBracket = resourcesNamesAsText.replace("[", "");
@@ -134,6 +207,13 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 	}
 
 	
+	/**
+	 * Searches the documents, returning each source plus {@code id} and {@code entity}.
+	 * @param elasticQuery the query
+	 * @param resourcesNames the indexes
+	 * @param fieldsToSearch the source fields returned
+	 * @return the documents
+	 */
 	public List<CcpJsonRepresentation> getResultAsList(CcpQueryOptions elasticQuery, String[] resourcesNames, String... fieldsToSearch) {
 		CcpJsonRepresentation response = this.getResultAsPackage("/_search", CcpHttpMethods.POST, 200, elasticQuery, resourcesNames, fieldsToSearch);
 		
@@ -143,6 +223,14 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 	}
 
 	
+	/**
+	 * Meant to map each document id to the value of the field. It reads {@code _id} from the documents, but they carry the
+	 * id in {@code id}, so every value goes under the empty key and only the last one is kept.
+	 * @param elasticQuery the query
+	 * @param resourcesNames the indexes
+	 * @param field the field
+	 * @return the values (see above)
+	 */
 	public CcpJsonRepresentation getResultAsMap(CcpQueryOptions elasticQuery, String[] resourcesNames, String field) {
 		List<CcpJsonRepresentation> resultAsList = this.getResultAsList(elasticQuery, resourcesNames, field);
 		CcpJsonRepresentation result = CcpOtherConstants.EMPTY_JSON;
@@ -157,6 +245,16 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 	}
 
 	
+	/**
+	 * Runs the query restricting the returned source to the given fields and returns the raw response.
+	 * @param url the request path
+	 * @param method the HTTP method
+	 * @param expectedStatus the expected status
+	 * @param elasticQuery the query
+	 * @param resourcesNames the indexes
+	 * @param fieldsToSearch the source fields returned
+	 * @return the raw response
+	 */
 	public CcpJsonRepresentation getResultAsPackage(String url, CcpHttpMethods method, int expectedStatus, CcpQueryOptions elasticQuery, String[] resourcesNames, String... fieldsToSearch) {
 		CcpJsonRepresentation queryWithSourceFields = elasticQuery.json.put(CcpJsonCommonsFields._source, Arrays.asList(fieldsToSearch));
 		CcpDbRequester dbUtils = CcpDependencyInjection.getDependency(CcpDbRequester.class);
@@ -166,6 +264,14 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 	}
 
 	
+	/**
+	 * Meant to map each bucket key of the aggregation named by the field to its value; like
+	 * {@link #getTermsStatis}, it reads the aggregation as a list, so the result is empty.
+	 * @param elasticQuery the query
+	 * @param resourcesNames the indexes
+	 * @param field the aggregation name
+	 * @return the values (see above)
+	 */
 	public CcpJsonRepresentation getMap(CcpQueryOptions elasticQuery, String[] resourcesNames, String field) {
 		CcpJsonRepresentation aggregations = this.getAggregations(elasticQuery, resourcesNames);
 		CcpFieldName aggregationFieldName = new CcpFieldName(field);
@@ -181,6 +287,12 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 	}
 
 	
+	/**
+	 * Runs the query and returns its aggregations (see {@link #getAggregations(CcpJsonRepresentation)}).
+	 * @param elasticQuery the query
+	 * @param resourcesNames the indexes
+	 * @return the aggregations
+	 */
 	public CcpJsonRepresentation getAggregations(CcpQueryOptions elasticQuery, String... resourcesNames) {
 		
 		CcpJsonRepresentation resultAsPackage = this.getResultAsPackage("/_search", CcpHttpMethods.POST, 200, elasticQuery, resourcesNames);
@@ -189,6 +301,12 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 		return result;
 	}
 
+	/**
+	 * Converts the aggregations of a search response: a metric aggregation becomes {@code name: value}; a bucket
+	 * aggregation becomes {@code name: {key: doc_count}}; a top-level {@code total.value} becomes {@code total}.
+	 * @param resultAsPackage the raw search response
+	 * @return the aggregations
+	 */
 	public static CcpJsonRepresentation getAggregations(CcpJsonRepresentation resultAsPackage) {
 		CcpJsonRepresentation innerJson = resultAsPackage.getInnerJson(JsonFieldNames.total);
 		CcpJsonRepresentation result = CcpOtherConstants.EMPTY_JSON;
