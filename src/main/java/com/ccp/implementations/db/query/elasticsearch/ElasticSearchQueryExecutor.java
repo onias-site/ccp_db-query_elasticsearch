@@ -41,8 +41,19 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 		/** Buckets of a bucket aggregation. */
 		buckets,
 		/** Number of documents of a bucket. */
-		doc_count
+		doc_count,
+		/** Script of an update by query. */
+		script,
+		/** Text of a script. */
+		source,
+		/** Parameters of a script. */
+		params,
+		/** Parameter of the update script with the fields to set. */
+		newValues
 	}
+
+	/** Painless script of {@link #update}: copies every entry of {@code params.newValues} into the document. */
+	static final String SCRIPT_TO_COPY_THE_NEW_VALUES = "for (entry in params.newValues.entrySet()) { ctx._source[entry.getKey()] = entry.getValue(); }";
 
 	/**
 	 * Meant to map each term of the aggregation named by the field to its count. It reads the aggregation as a list of
@@ -70,33 +81,41 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 	}
 	
 	/**
-	 * Deletes the documents matching the query ({@code POST /_delete_by_query}).
+	 * Deletes the documents matching the query ({@code POST /_delete_by_query?conflicts=proceed}). A document changed
+	 * between the search and the deletion is skipped and counted in {@code version_conflicts} of the response, instead of
+	 * aborting the whole request with 409; the caller decides whether to run it again. Until 2026-10-06 a single concurrent
+	 * write made the request fail.
 	 * @param elasticQuery the query
 	 * @param resourcesNames the indexes
-	 * @return the response of the database
+	 * @return the response of the database ({@code deleted}, {@code version_conflicts} and so on)
 	 */
 	public CcpJsonRepresentation delete(CcpQueryOptions elasticQuery, String... resourcesNames) {
 		CcpDbRequester dbUtils = CcpDependencyInjection.getDependency(CcpDbRequester.class);
-		
-		CcpJsonRepresentation response = dbUtils.executeHttpRequest("delete", "/_delete_by_query", CcpHttpMethods.POST, 200, elasticQuery.json,  resourcesNames, CcpHttpResponseType.singleRecord);
+
+		CcpJsonRepresentation response = dbUtils.executeHttpRequest("delete", "/_delete_by_query?conflicts=proceed", CcpHttpMethods.POST, 200, elasticQuery.json,  resourcesNames, CcpHttpResponseType.singleRecord);
 
 		return response;
 	}
 
 	
 	/**
-	 * Sends the query to {@code POST /_update_by_query}. The new values are NOT sent (there is no script), so the matching
-	 * documents are only reindexed as they are.
+	 * Sends the query to {@code POST /_update_by_query} with a painless script that copies each new value into the
+	 * {@code _source} of every matching document; the values travel as script parameters, never inside the script text.
 	 * @param elasticQuery the query
 	 * @param resourcesNames the indexes
-	 * @param newValues ignored
+	 * @param newValues the fields to set and their values
 	 * @return the response of the database
 	 */
 	public CcpJsonRepresentation update(CcpQueryOptions elasticQuery, String[] resourcesNames, CcpJsonRepresentation newValues) {
 		CcpDbRequester dbUtils = CcpDependencyInjection.getDependency(CcpDbRequester.class);
-		
-		CcpJsonRepresentation response = dbUtils.executeHttpRequest("update", "/_update_by_query", CcpHttpMethods.POST, 200, elasticQuery.json,  resourcesNames, CcpHttpResponseType.singleRecord);
-		
+
+		CcpJsonRepresentation scriptParams = CcpOtherConstants.EMPTY_JSON.put(JsonFieldNames.newValues, newValues.content);
+		CcpJsonRepresentation scriptWithSource = CcpOtherConstants.EMPTY_JSON.put(JsonFieldNames.source, SCRIPT_TO_COPY_THE_NEW_VALUES);
+		CcpJsonRepresentation script = scriptWithSource.put(JsonFieldNames.params, scriptParams.content);
+		CcpJsonRepresentation queryWithScript = elasticQuery.json.put(JsonFieldNames.script, script.content);
+
+		CcpJsonRepresentation response = dbUtils.executeHttpRequest("update", "/_update_by_query", CcpHttpMethods.POST, 200, queryWithScript,  resourcesNames, CcpHttpResponseType.singleRecord);
+
 		return response;
 	}
 	
@@ -107,7 +126,7 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 	 * @param scrollTime the expiration of the scroll context (e.g. "1m")
 	 * @param pageSize the page size
 	 * @param consumer receives each document
-	 * @param fields unused
+	 * @param fields the source fields returned; none returns the whole source
 	 * @return this executor
 	 */
 	public CcpQueryExecutor consumeQueryResult(CcpQueryOptions elasticQuery, String[] resourcesNames,
@@ -133,7 +152,7 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 	 * @param scrollTime the expiration of the scroll context
 	 * @param pageSize the page size
 	 * @param consumer receives each page
-	 * @param fields unused
+	 * @param fields the source fields returned; none returns the whole source
 	 * @return this executor
 	 */
 	public CcpQueryExecutor consumeQueryResult(CcpQueryOptions elasticQuery, String[] resourcesNames,
@@ -156,7 +175,8 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 				FunctionResponseHandlerToConsumeSearch searchDataTransform = new FunctionResponseHandlerToConsumeSearch();
 				CcpJsonRepresentation handlersFor200 = CcpOtherConstants.EMPTY_JSON.addJsonTransformer(200, CcpOtherConstants.DO_NOTHING);
 				CcpJsonRepresentation flows = handlersFor200.addJsonTransformer(404, CcpOtherConstants.RETURNS_EMPTY_JSON);
-				CcpJsonRepresentation response = dbUtils.executeHttpRequest("consumeQueryResult", url, CcpHttpMethods.POST, flows,  elasticQuery.json, CcpHttpResponseType.singleRecord);
+				CcpJsonRepresentation firstPageRequest = this.restrictSourceFields(elasticQuery, fields);
+				CcpJsonRepresentation response = dbUtils.executeHttpRequest("consumeQueryResult", url, CcpHttpMethods.POST, flows,  firstPageRequest, CcpHttpResponseType.singleRecord);
 				CcpJsonRepresentation firstPageResult = searchDataTransform.execute(response);
 				List<CcpJsonRepresentation> hits = firstPageResult.getAsJsonList(CcpJsonCommonsFields.hits);
 				scrollId = firstPageResult.getAsString(CcpJsonCommonsFields._scroll_id);
@@ -178,6 +198,25 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 	}
 
 	
+	/**
+	 * The query restricted to the given source fields; without fields, the query as it is (whole source). The pages
+	 * that follow through {@code /_search/scroll} keep the restriction of the first one.
+	 * @param elasticQuery the query
+	 * @param fields the source fields returned
+	 * @return the request body of the first page
+	 */
+	private CcpJsonRepresentation restrictSourceFields(CcpQueryOptions elasticQuery, String... fields) {
+		boolean noFields = fields.length == 0;
+
+		if(noFields) {
+			return elasticQuery.json;
+		}
+
+		List<String> sourceFields = Arrays.asList(fields);
+		CcpJsonRepresentation queryWithSourceFields = elasticQuery.json.put(CcpJsonCommonsFields._source, sourceFields);
+		return queryWithSourceFields;
+	}
+
 	/**
 	 * Counts the matching documents ({@code POST /<indexes>/_count}).
 	 * @param elasticQuery the query
