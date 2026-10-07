@@ -16,7 +16,6 @@ import com.ccp.especifications.db.utils.CcpDbRequester;
 import com.ccp.especifications.http.CcpHttpMethods;
 import com.ccp.especifications.http.CcpHttpResponseType;
 import com.ccp.json.fields.validation.CcpJsonCommonsFields;
-import com.ccp.decorators.CcpStringDecorator;
 
 /**
  * {@code CcpQueryExecutor} implementation for Elasticsearch. Supports paginated scroll search
@@ -56,26 +55,24 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 	static final String SCRIPT_TO_COPY_THE_NEW_VALUES = "for (entry in params.newValues.entrySet()) { ctx._source[entry.getKey()] = entry.getValue(); }";
 
 	/**
-	 * Meant to map each term of the aggregation named by the field to its count. It reads the aggregation as a list of
-	 * items with {@code key} and {@code value}, but {@link #getAggregations(CcpQueryOptions, String...)} returns it as a map
-	 * of key to count, so the result is empty.
+	 * Maps each term of the bucket aggregation named by the field to its count, as a whole number. Until 2026-10-07 it
+	 * read the aggregation as a list of items with {@code key} and {@code value}, but
+	 * {@link #getAggregations(CcpQueryOptions, String...)} already returns it as a map of key to count, so the result was
+	 * always empty.
 	 * @param elasticQuery the query
 	 * @param resourcesNames the indexes
 	 * @param fieldName the aggregation name
-	 * @return the statistics (see above)
+	 * @return the count of each term; empty when the query has no such aggregation
 	 */
 	public CcpJsonRepresentation getTermsStatis(CcpQueryOptions elasticQuery, String[] resourcesNames, String fieldName) {
+		CcpJsonRepresentation countByTerm = this.getMap(elasticQuery, resourcesNames, fieldName);
 		CcpJsonRepresentation termsStatistics = CcpOtherConstants.EMPTY_JSON;
-		CcpJsonRepresentation aggregations = this.getAggregations(elasticQuery, resourcesNames);
-		CcpFieldName aggregationFieldName = new CcpFieldName(fieldName);
+		Set<String> terms = countByTerm.fieldSet();
 
-		List<CcpJsonRepresentation> aggregationItems = aggregations.getAsJsonList(aggregationFieldName);
-
-		for (CcpJsonRepresentation aggregationItem : aggregationItems) {
-			CcpStringDecorator keyDecorator = aggregationItem.getAsStringDecorator(JsonFieldNames.key);
-			var key = keyDecorator.jsonFieldName();
-			Long bucketValue = aggregationItem.getAsLongNumber(CcpJsonCommonsFields.value);
-			termsStatistics = termsStatistics.put(key, bucketValue);
+		for (String term : terms) {
+			CcpFieldName termField = new CcpFieldName(term);
+			Long count = countByTerm.getAsLongNumber(termField);
+			termsStatistics = termsStatistics.put(termField, count);
 		}
 		return termsStatistics;
 	}
@@ -263,18 +260,19 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 
 	
 	/**
-	 * Meant to map each document id to the value of the field. It reads {@code _id} from the documents, but they carry the
-	 * id in {@code id}, so every value goes under the empty key and only the last one is kept.
+	 * Maps each document id to the value of the field. The id is read from {@code id}, where {@link FunctionSourceHandler}
+	 * puts it; until 2026-10-07 it was read from {@code _id}, which the records do not carry, so every value went under
+	 * the empty key and only the last one was kept.
 	 * @param elasticQuery the query
 	 * @param resourcesNames the indexes
 	 * @param field the field
-	 * @return the values (see above)
+	 * @return the value of the field by document id
 	 */
 	public CcpJsonRepresentation getResultAsMap(CcpQueryOptions elasticQuery, String[] resourcesNames, String field) {
 		List<CcpJsonRepresentation> resultAsList = this.getResultAsList(elasticQuery, resourcesNames, field);
 		CcpJsonRepresentation result = CcpOtherConstants.EMPTY_JSON;
 		for (CcpJsonRepresentation record : resultAsList) {
-			String id = record.getAsString(CcpJsonCommonsFields._id);
+			String id = record.getAsString(FunctionSourceHandler.JsonFieldNames.id);
 			CcpFieldName requestedField = new CcpFieldName(field);
 			Object value = record.get(requestedField);
 			CcpFieldName idField = new CcpFieldName(id);
@@ -304,25 +302,25 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 
 	
 	/**
-	 * Meant to map each bucket key of the aggregation named by the field to its value; like
-	 * {@link #getTermsStatis}, it reads the aggregation as a list, so the result is empty.
+	 * Maps each bucket key of the aggregation named by the field to its document count, as
+	 * {@link #getAggregations(CcpQueryOptions, String...)} builds it. Until 2026-10-07 it read the aggregation as a list,
+	 * so the result was always empty.
 	 * @param elasticQuery the query
 	 * @param resourcesNames the indexes
 	 * @param field the aggregation name
-	 * @return the values (see above)
+	 * @return the count of each bucket key; empty when the query has no such bucket aggregation
 	 */
 	public CcpJsonRepresentation getMap(CcpQueryOptions elasticQuery, String[] resourcesNames, String field) {
 		CcpJsonRepresentation aggregations = this.getAggregations(elasticQuery, resourcesNames);
 		CcpFieldName aggregationFieldName = new CcpFieldName(field);
-		List<CcpJsonRepresentation> aggregationItems = aggregations.getAsJsonList(aggregationFieldName);
-		CcpJsonRepresentation aggregationValuesByKey = CcpOtherConstants.EMPTY_JSON;
-		for (CcpJsonRepresentation aggregationItem : aggregationItems) {
-			Object value = aggregationItem.get(CcpJsonCommonsFields.value);
-			String key = aggregationItem.getAsString(JsonFieldNames.key);
-			CcpFieldName keyField = new CcpFieldName(key);
-			aggregationValuesByKey = aggregationValuesByKey.put(keyField, value);
+		boolean isBucketAggregation = aggregations.isInnerJson(aggregationFieldName);
+		boolean isNotBucketAggregation = false == isBucketAggregation;
+
+		if(isNotBucketAggregation) {
+			return CcpOtherConstants.EMPTY_JSON;
 		}
-		return aggregationValuesByKey;
+		CcpJsonRepresentation countByKey = aggregations.getInnerJson(aggregationFieldName);
+		return countByKey;
 	}
 
 	
@@ -342,12 +340,15 @@ class ElasticSearchQueryExecutor implements CcpQueryExecutor {
 
 	/**
 	 * Converts the aggregations of a search response: a metric aggregation becomes {@code name: value}; a bucket
-	 * aggregation becomes {@code name: {key: doc_count}}; a top-level {@code total.value} becomes {@code total}.
+	 * aggregation becomes {@code name: {key: doc_count}}; the {@code hits.total.value} of the response becomes
+	 * {@code total}. Until 2026-10-07 {@code total} was looked for at the root of the response, where Elasticsearch does
+	 * not put it, so it never came.
 	 * @param resultAsPackage the raw search response
 	 * @return the aggregations
 	 */
 	public static CcpJsonRepresentation getAggregations(CcpJsonRepresentation resultAsPackage) {
-		CcpJsonRepresentation innerJson = resultAsPackage.getInnerJson(JsonFieldNames.total);
+		CcpJsonRepresentation hits = resultAsPackage.getInnerJson(CcpJsonCommonsFields.hits);
+		CcpJsonRepresentation innerJson = hits.getInnerJson(JsonFieldNames.total);
 		CcpJsonRepresentation result = CcpOtherConstants.EMPTY_JSON;
 		boolean containsAllKeys = innerJson.containsAllFields(CcpJsonCommonsFields.value);
 		if(containsAllKeys) {
